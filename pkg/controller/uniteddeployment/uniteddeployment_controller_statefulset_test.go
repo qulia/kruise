@@ -17,6 +17,7 @@ limitations under the License.
 package uniteddeployment
 
 import (
+	"flag"
 	"fmt"
 	"reflect"
 	"sync"
@@ -30,6 +31,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -967,6 +969,171 @@ func TestStsRollingUpdatePartition(t *testing.T) {
 	}))
 }
 
+func TestStsCanaryUpdate(t *testing.T) {
+	g, requests, stopMgr, mgrStopped := setUp(t)
+	defer func() {
+		clean(g, c)
+		close(stopMgr)
+		mgrStopped.Wait()
+	}()
+
+	caseName := "test-sts-rolling-update-partition"
+	instance := &appsv1alpha1.UnitedDeployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      caseName,
+			Namespace: "default",
+		},
+		Spec: appsv1alpha1.UnitedDeploymentSpec{
+			Replicas: &ten,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"name": caseName,
+				},
+			},
+			Template: appsv1alpha1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"name": caseName,
+						},
+					},
+					Spec: appsv1.StatefulSetSpec{
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									"name": caseName,
+								},
+							},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Name:  "container-a",
+										Image: "nginx:1.0",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			UpdateStrategy: appsv1alpha1.UnitedDeploymentUpdateStrategy{
+				Type: appsv1alpha1.ManualUpdateStrategyType,
+			},
+			Topology: appsv1alpha1.Topology{
+				Subsets: []appsv1alpha1.Subset{
+					{
+						Name: "subset-a",
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
+								{
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"nodeA"},
+								},
+							},
+						},
+					},
+					{
+						Name: "subset-b",
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
+								{
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"nodeB"},
+								},
+							},
+						},
+					},
+				},
+			},
+			RevisionHistoryLimit: &ten,
+		},
+	}
+
+	// Create the UnitedDeployment object and expect the Reconcile and Deployment to be created
+	err := c.Create(context.TODO(), instance)
+	// The instance object may not be a valid object because it might be missing some required fields.
+	// Please modify the instance object by adding required fields and then remove the following if statement.
+	if apierrors.IsInvalid(err) {
+		t.Logf("failed to create object, got an invalid object error: %v", err)
+		return
+	}
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	defer c.Delete(context.TODO(), instance)
+	waitReconcilerProcessFinished(g, requests, 3)
+
+	stsList := expectedStsCount(g, instance, 2)
+	g.Expect(*stsList.Items[0].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
+	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
+
+	// Canary update
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	cu := NewCanaryUpdate(&appsv1alpha1.ManualUpdate{
+		Partitions: map[string]int32{
+			"subset-a": 6,
+			"subset-b": 6,
+		}}, map[string]int32{
+		"subset-a": 1,
+		"subset-b": 2,
+	})
+	instance.Spec.Template.StatefulSetTemplate.Spec.Template.Spec.Containers[0].Image = "nginx:2.0"
+	for cu.mu != nil {
+		t.Logf("Partitions:%v\n", cu.mu.Partitions)
+		// Update
+		instance.Spec.UpdateStrategy.ManualUpdate = cu.mu
+		g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+
+		validate(g, requests, stsList, instance, cu.mu)
+
+		cu.Analyze()
+		cu.Bake()
+		cu.Next()
+	}
+
+	// Final check
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+
+	stsList = expectedStsCount(g, instance, 2)
+	g.Expect(stsList.Items[0].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+	g.Expect(stsList.Items[1].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+
+	stsA := getSubsetByName(stsList, "subset-a")
+	g.Expect(stsA).ShouldNot(gomega.BeNil())
+	g.Expect(*stsA.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(0))
+
+	stsB := getSubsetByName(stsList, "subset-b")
+	g.Expect(stsB).ShouldNot(gomega.BeNil())
+	g.Expect(*stsB.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(0))
+
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	g.Expect(instance.Status.UpdateStatus.CurrentPartitions).Should(gomega.BeEquivalentTo(map[string]int32{
+		"subset-a": 0,
+		"subset-b": 0,
+	}))
+}
+
+func validate(g *gomega.GomegaWithT, requests chan reconcile.Request, stsList *appsv1.StatefulSetList, instance *appsv1alpha1.UnitedDeployment, nmu *appsv1alpha1.ManualUpdate) {
+	waitReconcilerProcessFinished(g, requests, 6)
+	stsList = expectedStsCount(g, instance, 2)
+	g.Expect(stsList.Items[0].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+	g.Expect(stsList.Items[1].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+
+	stsA := getSubsetByName(stsList, "subset-a")
+	g.Expect(stsA).ShouldNot(gomega.BeNil())
+	g.Expect(*stsA.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(nmu.Partitions["subset-a"]))
+
+	stsB := getSubsetByName(stsList, "subset-b")
+	g.Expect(stsB).ShouldNot(gomega.BeNil())
+	g.Expect(*stsB.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(nmu.Partitions["subset-b"]))
+
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	g.Expect(instance.Status.UpdateStatus.CurrentPartitions).Should(gomega.BeEquivalentTo(map[string]int32{
+		"subset-a": nmu.Partitions["subset-a"],
+		"subset-b": nmu.Partitions["subset-b"],
+	}))
+}
+
 func TestStsRollingUpdateDeleteStuckPod(t *testing.T) {
 	g, requests, stopMgr, mgrStopped := setUp(t)
 	defer func() {
@@ -1603,6 +1770,10 @@ func expectedStsCount(g *gomega.GomegaWithT, ud *appsv1alpha1.UnitedDeployment, 
 }
 
 func setUp(t *testing.T) (*gomega.GomegaWithT, chan reconcile.Request, chan struct{}, *sync.WaitGroup) {
+	klog.InitFlags(nil)
+	flag.Set("alsologtostderr", "true")
+	flag.Set("v", "4")
+	flag.Parse()
 	g := gomega.NewGomegaWithT(t)
 	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 	// channel when it is finished.

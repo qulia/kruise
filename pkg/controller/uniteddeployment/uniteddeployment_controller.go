@@ -220,9 +220,10 @@ func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[str
 			}
 		}
 
-		if subsetReplicas, exist := (*nextReplicas)[subset.Name]; exist && subsetPartition > subsetReplicas {
-			subsetPartition = subsetReplicas
-		}
+		/*
+			if subsetReplicas, exist := (*nextReplicas)[subset.Name]; exist && subsetPartition > subsetReplicas {
+				subsetPartition = subsetReplicas
+			}*/
 
 		partitions[subset.Name] = subsetPartition
 	}
