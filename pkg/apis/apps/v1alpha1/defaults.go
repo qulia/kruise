@@ -21,7 +21,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/apis/core/v1"
+	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -171,6 +171,10 @@ func SetDefaults_UnitedDeployment(obj *UnitedDeployment) {
 
 	if obj.Spec.UpdateStrategy.Type == ManualUpdateStrategyType && obj.Spec.UpdateStrategy.ManualUpdate == nil {
 		obj.Spec.UpdateStrategy.ManualUpdate = &ManualUpdate{}
+	}
+
+	if obj.Spec.UpdateStrategy.Type == CanaryUpdateStrategyType && obj.Spec.UpdateStrategy.CanaryUpdate == nil {
+		obj.Spec.UpdateStrategy.CanaryUpdate = &CanaryUpdate{RollCount: 1, BakeTimeSeconds: 2}
 	}
 
 	if obj.Spec.Template.StatefulSetTemplate != nil {

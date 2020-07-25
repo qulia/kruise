@@ -32,6 +32,8 @@ const (
 	// The update progress is able to be controlled by updating the partitions
 	// of each subset.
 	ManualUpdateStrategyType UpdateStrategyType = "Manual"
+
+	CanaryUpdateStrategyType UpdateStrategyType = "Canary"
 )
 
 // UnitedDeploymentConditionType indicates valid conditions type of a UnitedDeployment.
@@ -110,6 +112,10 @@ type UnitedDeploymentUpdateStrategy struct {
 	// Includes all of the parameters a Manual update strategy needs.
 	// +optional
 	ManualUpdate *ManualUpdate `json:"manualUpdate,omitempty"`
+
+	// Includes all of the parameters a Manual update strategy needs.
+	// +optional
+	CanaryUpdate *CanaryUpdate `json:"canaryUpdate,omitempty"`
 }
 
 // ManualUpdate is a update strategy which allows users to control the update progress
@@ -118,6 +124,14 @@ type ManualUpdate struct {
 	// Indicates number of subset partition.
 	// +optional
 	Partitions map[string]int32 `json:"partitions,omitempty"`
+}
+
+type CanaryUpdate struct {
+	// Indicates number of subset partition.
+	// +optional
+	RollCount int32 `json:"rollCount,omitempty"`
+
+	BakeTimeSeconds int32 `json:"bakeTime,omitempty"`
 }
 
 // Topology defines the spread detail of each subset under UnitedDeployment.

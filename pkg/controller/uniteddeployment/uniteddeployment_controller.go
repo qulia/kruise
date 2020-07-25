@@ -178,9 +178,14 @@ func (r *ReconcileUnitedDeployment) Reconcile(request reconcile.Request) (reconc
 	if !effectiveSpecifiedReplicas {
 		r.recorder.Eventf(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSpecifySubbsetReplicas), "Specified subset replicas is ineffective: %s", ineffectiveReason)
 	}
-
-	nextPartitions := calcNextPartitions(instance, nextReplicas)
+	upgrade := currentRevision.Revision != 0
+	nextPartitions := calcNextPartitions(instance, nextReplicas, upgrade)
 	klog.V(4).Infof("Get UnitedDeployment %s/%s next partition %v", instance.Namespace, instance.Name, nextPartitions)
+
+	if instance.Spec.UpdateStrategy.Type == appsv1alpha1.CanaryUpdateStrategyType && upgrade {
+		return rollPartitions(r, instance, nameToSubset, nextReplicas, nextPartitions,
+			currentRevision, updatedRevision, subsetType, oldStatus, collisionCount, control, expectedRevision)
+	}
 
 	newStatus, err := r.manageSubsets(instance, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, subsetType)
 	if err != nil {
@@ -210,7 +215,7 @@ func (r *ReconcileUnitedDeployment) getNameToSubset(instance *appsv1alpha1.Unite
 	return nameToSubset, nil
 }
 
-func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[string]int32) *map[string]int32 {
+func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[string]int32, upgrade bool) *map[string]int32 {
 	partitions := map[string]int32{}
 	for _, subset := range ud.Spec.Topology.Subsets {
 		var subsetPartition int32
@@ -222,6 +227,12 @@ func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[str
 
 		if subsetReplicas, exist := (*nextReplicas)[subset.Name]; exist && subsetPartition > subsetReplicas {
 			subsetPartition = subsetReplicas
+		}
+
+		if subsetReplicas, exist := (*nextReplicas)[subset.Name]; exist && subsetReplicas > 0 {
+			if ud.Spec.UpdateStrategy.Type == appsv1alpha1.CanaryUpdateStrategyType && upgrade {
+				subsetPartition = subsetReplicas + 1
+			}
 		}
 
 		partitions[subset.Name] = subsetPartition
@@ -373,8 +384,8 @@ func (r *ReconcileUnitedDeployment) updateUnitedDeployment(ud *appsv1alpha1.Unit
 	var getErr, updateErr error
 	for i, obj := 0, ud; ; i++ {
 		klog.V(4).Infof(fmt.Sprintf("The %d th time updating status for %v: %s/%s, ", i, obj.Kind, obj.Namespace, obj.Name) +
-			fmt.Sprintf("replicas %d->%d (need %d), ", obj.Status.Replicas, newStatus.Replicas, obj.Spec.Replicas) +
-			fmt.Sprintf("readyReplicas %d->%d (need %d), ", obj.Status.ReadyReplicas, newStatus.ReadyReplicas, obj.Spec.Replicas) +
+			fmt.Sprintf("replicas %d->%d (need %d), ", obj.Status.Replicas, newStatus.Replicas, *obj.Spec.Replicas) +
+			fmt.Sprintf("readyReplicas %d->%d (need %d), ", obj.Status.ReadyReplicas, newStatus.ReadyReplicas, *obj.Spec.Replicas) +
 			fmt.Sprintf("updatedReplicas %d->%d, ", obj.Status.UpdatedReplicas, newStatus.UpdatedReplicas) +
 			fmt.Sprintf("updatedReadyReplicas %d->%d, ", obj.Status.UpdatedReadyReplicas, newStatus.UpdatedReadyReplicas) +
 			fmt.Sprintf("sequence No: %v->%v", obj.Status.ObservedGeneration, newStatus.ObservedGeneration))
