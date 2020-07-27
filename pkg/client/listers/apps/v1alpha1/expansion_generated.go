@@ -42,6 +42,18 @@ type DaemonSetListerExpansion interface{}
 // DaemonSetNamespaceLister.
 type DaemonSetNamespaceListerExpansion interface{}
 
+// ImagePullJobListerExpansion allows custom methods to be added to
+// ImagePullJobLister.
+type ImagePullJobListerExpansion interface{}
+
+// ImagePullJobNamespaceListerExpansion allows custom methods to be added to
+// ImagePullJobNamespaceLister.
+type ImagePullJobNamespaceListerExpansion interface{}
+
+// NodeImageListerExpansion allows custom methods to be added to
+// NodeImageLister.
+type NodeImageListerExpansion interface{}
+
 // SidecarSetListerExpansion allows custom methods to be added to
 // SidecarSetLister.
 type SidecarSetListerExpansion interface{}
@@ -53,6 +65,14 @@ type StatefulSetListerExpansion interface{}
 // StatefulSetNamespaceListerExpansion allows custom methods to be added to
 // StatefulSetNamespaceLister.
 type StatefulSetNamespaceListerExpansion interface{}
+
+// StatefulSetRolloutListerExpansion allows custom methods to be added to
+// StatefulSetRolloutLister.
+type StatefulSetRolloutListerExpansion interface{}
+
+// StatefulSetRolloutNamespaceListerExpansion allows custom methods to be added to
+// StatefulSetRolloutNamespaceLister.
+type StatefulSetRolloutNamespaceListerExpansion interface{}
 
 // UnitedDeploymentListerExpansion allows custom methods to be added to
 // UnitedDeploymentLister.

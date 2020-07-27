@@ -1,6 +1,6 @@
 module github.com/openkruise/kruise
 
-go 1.14
+go 1.13
 
 require (
 	cloud.google.com/go v0.37.4 // indirect
@@ -76,4 +76,4 @@ require (
 	sigs.k8s.io/yaml v1.1.0 // indirect
 )
 
-//replace gopkg.in/fsnotify.v1 v1.4.7 => github.com/fsnotify/fsnotify v1.4.7
+replace gopkg.in/fsnotify.v1 v1.4.7 => github.com/fsnotify/fsnotify v1.4.7

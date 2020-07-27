@@ -21,7 +21,6 @@ package v1alpha1
 import (
 	v1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/client/clientset/versioned/scheme"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -30,8 +29,11 @@ type AppsV1alpha1Interface interface {
 	BroadcastJobsGetter
 	CloneSetsGetter
 	DaemonSetsGetter
+	ImagePullJobsGetter
+	NodeImagesGetter
 	SidecarSetsGetter
 	StatefulSetsGetter
+	StatefulSetRolloutsGetter
 	UnitedDeploymentsGetter
 }
 
@@ -52,12 +54,24 @@ func (c *AppsV1alpha1Client) DaemonSets(namespace string) DaemonSetInterface {
 	return newDaemonSets(c, namespace)
 }
 
+func (c *AppsV1alpha1Client) ImagePullJobs(namespace string) ImagePullJobInterface {
+	return newImagePullJobs(c, namespace)
+}
+
+func (c *AppsV1alpha1Client) NodeImages() NodeImageInterface {
+	return newNodeImages(c)
+}
+
 func (c *AppsV1alpha1Client) SidecarSets() SidecarSetInterface {
 	return newSidecarSets(c)
 }
 
 func (c *AppsV1alpha1Client) StatefulSets(namespace string) StatefulSetInterface {
 	return newStatefulSets(c, namespace)
+}
+
+func (c *AppsV1alpha1Client) StatefulSetRollouts(namespace string) StatefulSetRolloutInterface {
+	return newStatefulSetRollouts(c, namespace)
 }
 
 func (c *AppsV1alpha1Client) UnitedDeployments(namespace string) UnitedDeploymentInterface {
@@ -96,7 +110,7 @@ func setConfigDefaults(config *rest.Config) error {
 	gv := v1alpha1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

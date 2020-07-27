@@ -44,6 +44,9 @@ fmt: go_check
 vet:
 	go vet ./pkg/... ./cmd/...
 
+update-gen:generate
+	vendor/k8s.io/code-generator/generate-groups.sh all github.com/openkruise/kruise/pkg/client github.com/openkruise/kruise/pkg/apis apps:v1alpha1
+
 # Generate code
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths="./pkg/apis/..."

@@ -32,59 +32,59 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// UnitedDeploymentInformer provides access to a shared informer and lister for
-// UnitedDeployments.
-type UnitedDeploymentInformer interface {
+// ImagePullJobInformer provides access to a shared informer and lister for
+// ImagePullJobs.
+type ImagePullJobInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.UnitedDeploymentLister
+	Lister() v1alpha1.ImagePullJobLister
 }
 
-type unitedDeploymentInformer struct {
+type imagePullJobInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewUnitedDeploymentInformer constructs a new informer for UnitedDeployment type.
+// NewImagePullJobInformer constructs a new informer for ImagePullJob type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewUnitedDeploymentInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredUnitedDeploymentInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewImagePullJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredImagePullJobInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredUnitedDeploymentInformer constructs a new informer for UnitedDeployment type.
+// NewFilteredImagePullJobInformer constructs a new informer for ImagePullJob type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredUnitedDeploymentInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredImagePullJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().UnitedDeployments(namespace).List(context.TODO(), options)
+				return client.AppsV1alpha1().ImagePullJobs(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().UnitedDeployments(namespace).Watch(context.TODO(), options)
+				return client.AppsV1alpha1().ImagePullJobs(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&appsv1alpha1.UnitedDeployment{},
+		&appsv1alpha1.ImagePullJob{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *unitedDeploymentInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredUnitedDeploymentInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *imagePullJobInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredImagePullJobInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *unitedDeploymentInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1alpha1.UnitedDeployment{}, f.defaultInformer)
+func (f *imagePullJobInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&appsv1alpha1.ImagePullJob{}, f.defaultInformer)
 }
 
-func (f *unitedDeploymentInformer) Lister() v1alpha1.UnitedDeploymentLister {
-	return v1alpha1.NewUnitedDeploymentLister(f.Informer().GetIndexer())
+func (f *imagePullJobInformer) Lister() v1alpha1.ImagePullJobLister {
+	return v1alpha1.NewImagePullJobLister(f.Informer().GetIndexer())
 }

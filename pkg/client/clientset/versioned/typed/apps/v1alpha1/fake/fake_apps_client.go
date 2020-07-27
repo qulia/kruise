@@ -40,12 +40,24 @@ func (c *FakeAppsV1alpha1) DaemonSets(namespace string) v1alpha1.DaemonSetInterf
 	return &FakeDaemonSets{c, namespace}
 }
 
+func (c *FakeAppsV1alpha1) ImagePullJobs(namespace string) v1alpha1.ImagePullJobInterface {
+	return &FakeImagePullJobs{c, namespace}
+}
+
+func (c *FakeAppsV1alpha1) NodeImages() v1alpha1.NodeImageInterface {
+	return &FakeNodeImages{c}
+}
+
 func (c *FakeAppsV1alpha1) SidecarSets() v1alpha1.SidecarSetInterface {
 	return &FakeSidecarSets{c}
 }
 
 func (c *FakeAppsV1alpha1) StatefulSets(namespace string) v1alpha1.StatefulSetInterface {
 	return &FakeStatefulSets{c, namespace}
+}
+
+func (c *FakeAppsV1alpha1) StatefulSetRollouts(namespace string) v1alpha1.StatefulSetRolloutInterface {
+	return &FakeStatefulSetRollouts{c, namespace}
 }
 
 func (c *FakeAppsV1alpha1) UnitedDeployments(namespace string) v1alpha1.UnitedDeploymentInterface {

@@ -836,6 +836,10 @@ func TestStsRollingUpdatePartition(t *testing.T) {
 			},
 			UpdateStrategy: appsv1alpha1.UnitedDeploymentUpdateStrategy{
 				Type: appsv1alpha1.ManualUpdateStrategyType,
+				ManualUpdate: &appsv1alpha1.ManualUpdate{Partitions: map[string]int32{
+					"subset-a": 6,
+					"subset-b": 6,
+				}},
 			},
 			Topology: appsv1alpha1.Topology{
 				Subsets: []appsv1alpha1.Subset{
@@ -884,6 +888,8 @@ func TestStsRollingUpdatePartition(t *testing.T) {
 	stsList := expectedStsCount(g, instance, 2)
 	g.Expect(*stsList.Items[0].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
 	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
+	g.Expect(stsList.Items[0].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:1.0"))
+	g.Expect(stsList.Items[1].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:1.0"))
 
 	// update with partition
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())

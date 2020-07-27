@@ -1,0 +1,28 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: StatefulSetRollout
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: statefulset-rollout-sample
+spec:
+  replicas: 6
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: foo
+  template:
+    statefulSetTemplate:
+      metadata:
+        labels:
+          app: foo
+      spec:
+        template:
+          metadata:
+            labels:
+              app: foo
+          spec:
+            containers:
+              - name: nginx
+                image: nginx:1.0
+        rollout:
+          type: blue-green
